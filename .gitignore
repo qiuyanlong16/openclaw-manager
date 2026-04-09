@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Frontend build output
+dist/
+
+# Rust build output
+src-tauri/target/
+
+# Tauri generated code
+src-tauri/gen/
+
+# Tauri CLI cache
+src-tauri/.tauri/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+
+# Logs
+*.log
+
+# Local Claude config
+.claude/
+
+# Cargo lock for non-library projects (optional, keeping for reproducible builds)
+# src-tauri/Cargo.lock
