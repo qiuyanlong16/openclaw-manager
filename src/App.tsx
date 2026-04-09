@@ -21,11 +21,11 @@ function App() {
           isDeploying={isDeploying}
           isUninstalling={isUninstalling}
           onDeployStart={() => setIsDeploying(true)}
-          onDeployEnd={(success) => {
+          onDeployEnd={(_success) => {
             setIsDeploying(false);
           }}
           onUninstallStart={() => setIsUninstalling(true)}
-          onUninstallEnd={(success) => {
+          onUninstallEnd={(_success) => {
             setIsUninstalling(false);
           }}
         />
