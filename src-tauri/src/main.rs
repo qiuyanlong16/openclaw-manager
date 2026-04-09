@@ -2,7 +2,7 @@
 
 use serde::Serialize;
 use std::process::Command;
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 use tokio::process::Command as TokioCommand;
 
 #[derive(Serialize, Clone)]
