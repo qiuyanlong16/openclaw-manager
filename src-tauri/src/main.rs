@@ -57,27 +57,6 @@ fn emit_log(app: &tauri::AppHandle, level: &str, message: &str) {
     );
 }
 
-fn run_command(app: &tauri::AppHandle, cmd: &str, args: &[&str], label: &str) -> Result<String, String> {
-    emit_log(app, "info", &format!("正在执行: {}", label));
-    let output = Command::new(cmd)
-        .args(args)
-        .output()
-        .map_err(|e| format!("{} 失败: {}", label, e))?;
-
-    if output.status.success() {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        if !stdout.trim().is_empty() {
-            emit_log(app, "info", stdout.trim());
-        }
-        Ok(stdout.trim().to_string())
-    } else {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let msg = format!("{} 失败: {}", label, stderr.trim());
-        emit_log(app, "error", &msg);
-        Err(msg)
-    }
-}
-
 async fn run_command_async(app: &tauri::AppHandle, cmd: &str, args: &[&str], label: &str) -> Result<String, String> {
     emit_log(app, "info", &format!("正在执行: {}", label));
     let mut command = TokioCommand::new(cmd);
