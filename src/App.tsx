@@ -1,8 +1,16 @@
+import EnvironmentCheck from "./components/EnvironmentCheck";
+import "./App.css";
+
 function App() {
   return (
-    <div style={{ padding: 20 }}>
-      <h1>OpenClaw Manager</h1>
-      <p>Loading...</p>
+    <div className="app">
+      <header className="app-header">
+        <div className="logo" />
+        <h1>OpenClaw Manager</h1>
+      </header>
+      <div className="content">
+        <EnvironmentCheck />
+      </div>
     </div>
   );
 }

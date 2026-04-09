@@ -1,0 +1,187 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Ubuntu", "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: #f5f5f5;
+  color: #333;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 16px;
+  gap: 16px;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-header h1 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.app-header .logo {
+  width: 24px;
+  height: 24px;
+  background: #e95420;
+  border-radius: 4px;
+}
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.card h2 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #666;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.env-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.env-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot.ok {
+  background: #4caf50;
+}
+
+.status-dot.error {
+  background: #f44336;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.btn {
+  flex: 1;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #e95420;
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #c7431b;
+}
+
+.btn-danger {
+  background: #f44336;
+  color: #fff;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #d32f2f;
+}
+
+.btn-small {
+  padding: 6px 16px;
+  font-size: 0.85rem;
+  flex: none;
+}
+
+.gateway-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.gateway-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+}
+
+.gateway-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.log-viewer {
+  background: #2d2d2d;
+  color: #e0e0e0;
+  border-radius: 6px;
+  padding: 12px;
+  font-family: "Ubuntu Mono", "Consolas", monospace;
+  font-size: 0.8rem;
+  max-height: 160px;
+  overflow-y: auto;
+  min-height: 80px;
+}
+
+.log-viewer h2 {
+  color: #999;
+  margin-bottom: 8px;
+}
+
+.log-entry {
+  padding: 2px 0;
+  line-height: 1.4;
+}
+
+.log-entry.info {
+  color: #8bc34a;
+}
+
+.log-entry.error {
+  color: #f44336;
+}
+
+.log-entry.warn {
+  color: #ff9800;
+}
