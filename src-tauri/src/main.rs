@@ -3,6 +3,7 @@
 use serde::Serialize;
 use std::process::Command;
 use tauri::{Emitter, Manager};
+use tokio::process::Command as TokioCommand;
 
 #[derive(Serialize, Clone)]
 struct EnvCheckResult {
@@ -77,6 +78,29 @@ fn run_command(app: &tauri::AppHandle, cmd: &str, args: &[&str], label: &str) ->
     }
 }
 
+async fn run_command_async(app: &tauri::AppHandle, cmd: &str, args: &[&str], label: &str) -> Result<String, String> {
+    emit_log(app, "info", &format!("正在执行: {}", label));
+    let mut command = TokioCommand::new(cmd);
+    command.args(args);
+    let output = command
+        .output()
+        .await
+        .map_err(|e| format!("{} 失败: {}", label, e))?;
+
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        if !stdout.trim().is_empty() {
+            emit_log(app, "info", stdout.trim());
+        }
+        Ok(stdout.trim().to_string())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let msg = format!("{} 失败: {}", label, stderr.trim());
+        emit_log(app, "error", &msg);
+        Err(msg)
+    }
+}
+
 #[tauri::command]
 fn check_environment() -> EnvCheckResult {
     EnvCheckResult {
@@ -85,8 +109,8 @@ fn check_environment() -> EnvCheckResult {
     }
 }
 
-#[tauri::command]
-fn deploy_openclaw(app: tauri::AppHandle) -> Result<DeployResult, String> {
+#[tauri::command(async)]
+async fn deploy_openclaw(app: tauri::AppHandle) -> Result<DeployResult, String> {
     emit_log(&app, "info", "=== 开始部署 OpenClaw ===");
 
     // Check Node.js
@@ -127,12 +151,12 @@ fn deploy_openclaw(app: tauri::AppHandle) -> Result<DeployResult, String> {
 
     // Install OpenClaw via npm
     emit_log(&app, "info", "正在安装 OpenClaw...");
-    run_command(&app, "npm", &["install", "-g", "openclaw@latest"], "npm install")?;
+    run_command_async(&app, "npm", &["install", "-g", "openclaw@latest"], "npm install").await?;
     emit_log(&app, "info", "OpenClaw 安装完成");
 
     // Start gateway
     emit_log(&app, "info", "正在启动 OpenClaw 网关...");
-    run_command(&app, "openclaw", &["gateway", "start"], "启动网关")?;
+    run_command_async(&app, "openclaw", &["gateway", "start"], "启动网关").await?;
     emit_log(&app, "info", "网关已启动");
 
     emit_log(&app, "info", "=== OpenClaw 部署完成 ===");
@@ -142,17 +166,17 @@ fn deploy_openclaw(app: tauri::AppHandle) -> Result<DeployResult, String> {
     })
 }
 
-#[tauri::command]
-fn uninstall_openclaw(app: tauri::AppHandle) -> Result<DeployResult, String> {
+#[tauri::command(async)]
+async fn uninstall_openclaw(app: tauri::AppHandle) -> Result<DeployResult, String> {
     emit_log(&app, "info", "=== 开始卸载 OpenClaw ===");
 
     // Stop gateway
     emit_log(&app, "info", "正在停止网关...");
-    let _ = run_command(&app, "openclaw", &["gateway", "stop"], "停止网关");
+    let _ = run_command_async(&app, "openclaw", &["gateway", "stop"], "停止网关").await;
 
     // Uninstall npm package
     emit_log(&app, "info", "正在卸载 OpenClaw npm 包...");
-    run_command(&app, "npm", &["uninstall", "-g", "openclaw"], "npm uninstall")?;
+    run_command_async(&app, "npm", &["uninstall", "-g", "openclaw"], "npm uninstall").await?;
     emit_log(&app, "info", "OpenClaw npm 包已卸载");
 
     // Clean config directory
@@ -199,10 +223,10 @@ fn get_gateway_status() -> GatewayStatusResult {
     }
 }
 
-#[tauri::command]
-fn start_gateway(app: tauri::AppHandle) -> Result<DeployResult, String> {
+#[tauri::command(async)]
+async fn start_gateway(app: tauri::AppHandle) -> Result<DeployResult, String> {
     emit_log(&app, "info", "正在启动网关...");
-    run_command(&app, "openclaw", &["gateway", "start"], "启动网关")?;
+    run_command_async(&app, "openclaw", &["gateway", "start"], "启动网关").await?;
     emit_log(&app, "info", "网关已启动");
     Ok(DeployResult {
         success: true,
@@ -210,10 +234,10 @@ fn start_gateway(app: tauri::AppHandle) -> Result<DeployResult, String> {
     })
 }
 
-#[tauri::command]
-fn stop_gateway(app: tauri::AppHandle) -> Result<DeployResult, String> {
+#[tauri::command(async)]
+async fn stop_gateway(app: tauri::AppHandle) -> Result<DeployResult, String> {
     emit_log(&app, "info", "正在停止网关...");
-    run_command(&app, "openclaw", &["gateway", "stop"], "停止网关")?;
+    run_command_async(&app, "openclaw", &["gateway", "stop"], "停止网关").await?;
     emit_log(&app, "info", "网关已停止");
     Ok(DeployResult {
         success: true,

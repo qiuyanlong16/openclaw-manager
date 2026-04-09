@@ -32,6 +32,9 @@ export default function ActionButtons({
   }
 
   async function handleUninstall() {
+    if (!window.confirm("确定要卸载 OpenClaw 吗？此操作将删除所有配置和数据。")) {
+      return;
+    }
     onUninstallStart();
     try {
       const result = await invoke<{ success: boolean; error?: string }>(
