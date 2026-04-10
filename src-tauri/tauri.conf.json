@@ -41,9 +41,6 @@
         ],
         "section": "utility",
         "priority": "optional"
-      },
-      "appimage": {
-        "bundleMediaFramework": true
       }
     },
     "windows": {

@@ -10,6 +10,61 @@ body {
   color: #333;
 }
 
+/* --- App Loading Screen --- */
+
+.app-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: linear-gradient(135deg, #fef3f0 0%, #f5f5f5 50%, #fef3f0 100%);
+}
+
+.app-loading__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.app-loading__logo {
+  width: 64px;
+  height: 64px;
+  animation: logo-spin 2s ease-in-out infinite;
+}
+
+@keyframes logo-spin {
+  0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.9; }
+  50% { transform: scale(1.1) rotate(5deg); opacity: 1; }
+}
+
+.app-loading__dots {
+  display: flex;
+  gap: 8px;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  animation: dot-bounce 1.4s ease-in-out infinite;
+}
+
+.dot-1 { background: #e95420; animation-delay: 0s; }
+.dot-2 { background: #ff9800; animation-delay: 0.2s; }
+.dot-3 { background: #4caf50; animation-delay: 0.4s; }
+
+@keyframes dot-bounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1.1); opacity: 1; }
+}
+
+.app-loading__text {
+  font-size: 0.95rem;
+  color: #999;
+  letter-spacing: 1px;
+}
+
 .app {
   display: flex;
   flex-direction: column;

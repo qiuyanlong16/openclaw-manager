@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import EnvironmentCheck from "./components/EnvironmentCheck";
 import ActionButtons from "./components/ActionButtons";
 import GatewayStatus from "./components/GatewayStatus";
@@ -7,16 +7,41 @@ import Settings from "./components/Settings";
 import { useLogListener } from "./hooks/useLogListener";
 import "./App.css";
 
+function AppLoading() {
+  return (
+    <div className="app-loading">
+      <div className="app-loading__content">
+        <img src="/favicon.svg" alt="" className="app-loading__logo" />
+        <div className="app-loading__dots">
+          <span className="dot dot-1" />
+          <span className="dot dot-2" />
+          <span className="dot dot-3" />
+        </div>
+        <p className="app-loading__text">正在启动...</p>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const { logs, isDeploying, setIsDeploying, isUninstalling, setIsUninstalling } =
     useLogListener();
   const [showSettings, setShowSettings] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 1200);
+    return () => clearTimeout(timer);
+  }, []);
 
   const refreshEnv = useCallback(() => {
-    // Brief delay to ensure backend file writes have settled
     setTimeout(() => setRefreshKey((k) => k + 1), 800);
   }, []);
+
+  if (loading) {
+    return <AppLoading />;
+  }
 
   return (
     <div className="app">

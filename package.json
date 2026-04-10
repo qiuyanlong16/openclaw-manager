@@ -8,7 +8,7 @@
     "build": "tsc && vite build",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "build:linux": "tauri build --bundles deb,appimage",
+    "build:linux": "tauri build --bundles deb",
     "build:windows": "tauri build --bundles nsis",
     "build:all": "tauri build"
   },
