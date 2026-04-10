@@ -44,6 +44,14 @@ export default function GatewayStatus() {
     }
   }
 
+  async function handleOpenBrowser() {
+    try {
+      await invoke("open_url", { url: "http://127.0.0.1:18789/" });
+    } catch (e) {
+      console.error("Failed to open browser:", e);
+    }
+  }
+
   return (
     <div className="card">
       <h2>网关状态</h2>
@@ -63,6 +71,14 @@ export default function GatewayStatus() {
           </span>
         </div>
         <div className="gateway-actions">
+          <button
+            className="btn btn-small btn-primary"
+            onClick={handleOpenBrowser}
+            disabled={!running}
+            title="在浏览器中打开 OpenClaw"
+          >
+            打开浏览器
+          </button>
           <button
             className="btn btn-small btn-primary"
             onClick={handleStart}

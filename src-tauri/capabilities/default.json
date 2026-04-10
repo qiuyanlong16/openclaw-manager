@@ -1,0 +1,14 @@
+{
+  "identifier": "default",
+  "windows": ["*"],
+  "permissions": [
+    "core:event:allow-listen",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        { "url": "http://127.0.0.1:18789/" },
+        { "url": "http://localhost:18789/" }
+      ]
+    }
+  ]
+}

@@ -31,10 +31,17 @@ body {
 }
 
 .app-header .logo {
-  width: 24px;
-  height: 24px;
-  background: #e95420;
-  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+}
+
+.app-header .logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .content {
@@ -159,7 +166,7 @@ body {
   padding: 12px;
   font-family: "Ubuntu Mono", "Consolas", monospace;
   font-size: 0.8rem;
-  max-height: 160px;
+  max-height: 280px;
   overflow-y: auto;
   min-height: 80px;
 }
@@ -184,4 +191,500 @@ body {
 
 .log-entry.warn {
   color: #ff9800;
+}
+
+/* Header settings button */
+.header-spacer {
+  flex: 1;
+}
+
+.btn-settings {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  color: #666;
+  transition: background 0.2s;
+}
+
+.btn-settings:hover {
+  background: #eee;
+}
+
+/* Settings overlay */
+.settings-overlay {
+  position: fixed;
+  top: -16px;
+  left: -16px;
+  right: -16px;
+  bottom: -16px;
+  background: #fff;
+  z-index: 9999;
+  margin: 0;
+  padding: 0;
+}
+
+.settings-panel {
+  background: #fff;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 28px;
+  border-bottom: 1px solid #eee;
+}
+
+.settings-header h1 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.settings-close {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: #999;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.settings-close:hover {
+  background: #f0f0f0;
+}
+
+.settings-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.settings-sidebar {
+  width: 200px;
+  border-right: 1px solid #eee;
+  padding: 20px 12px;
+}
+
+.settings-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  color: #666;
+  text-align: left;
+  margin-bottom: 2px;
+}
+
+.settings-nav:hover {
+  background: #f5f5f5;
+}
+
+.settings-nav.active {
+  background: #f9ece8;
+  color: #e95420;
+  font-weight: 500;
+}
+
+.nav-icon {
+  font-size: 1.1rem;
+}
+
+.settings-content {
+  flex: 1;
+  padding: 32px 36px;
+  overflow-y: auto;
+}
+
+.settings-content h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.settings-desc {
+  color: #666;
+  font-size: 0.9rem;
+  margin-bottom: 20px;
+}
+
+.provider-tabs {
+  display: flex;
+  gap: 2px;
+  background: #f5f5f5;
+  border-radius: 8px;
+  padding: 3px;
+  margin-bottom: 20px;
+}
+
+.provider-tab {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: #666;
+  transition: all 0.2s;
+}
+
+.provider-tab:hover {
+  color: #333;
+}
+
+.provider-tab.active {
+  background: #e95420;
+  color: #fff;
+  font-weight: 500;
+}
+
+.form-group {
+  margin-bottom: 18px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 6px;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: #f9f9f9;
+  color: #333;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  border-color: #e95420;
+  background: #fff;
+}
+
+.input-row {
+  display: flex;
+  gap: 4px;
+}
+
+.input-row input {
+  flex: 1;
+}
+
+.toggle-visibility {
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 0 10px;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 38px;
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.save-status {
+  font-size: 0.9rem;
+}
+.save-status:not(.error) {
+  color: #4caf50;
+}
+.save-status.error {
+  color: #f44336;
+}
+
+.form-actions .btn {
+  flex: none;
+  padding: 10px 24px;
+}
+
+/* --- Skills Management --- */
+
+.skills-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  color: #999;
+  gap: 16px;
+}
+
+.lobster-loader {
+  width: 80px;
+  height: 80px;
+  animation: lobster-bounce 1.5s ease-in-out infinite;
+}
+
+@keyframes lobster-bounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-12px) scale(1.05); }
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #eee;
+  border-top-color: #e95420;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner-sm {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #eee;
+  border-top-color: #e95420;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+.skills-loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  z-index: 10;
+  border-radius: 8px;
+  color: #999;
+  font-size: 0.85rem;
+  pointer-events: none;
+}
+
+.skills-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.skills-header h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.skills-count {
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.skills-toolbar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  align-items: center;
+}
+
+.skills-search {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  background: #f9f9f9;
+}
+
+.skills-search:focus {
+  outline: none;
+  border-color: #e95420;
+  background: #fff;
+}
+
+.skills-filter {
+  display: flex;
+  gap: 4px;
+  background: #f5f5f5;
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.skills-filter-btn {
+  padding: 6px 14px;
+  border: none;
+  background: none;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: #666;
+}
+
+.skills-filter-btn.active {
+  background: #fff;
+  color: #333;
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+
+.skills-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.skill-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  transition: border-color 0.15s;
+}
+
+.skill-card:hover {
+  border-color: #ddd;
+}
+
+.skill-card.disabled {
+  opacity: 0.55;
+}
+
+.skill-info {
+  display: flex;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.skill-emoji {
+  font-size: 1.3rem;
+  flex-shrink: 0;
+  width: 28px;
+  text-align: center;
+}
+
+.skill-details {
+  min-width: 0;
+}
+
+.skill-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.skill-name {
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.skill-badge {
+  font-size: 0.7rem;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 500;
+}
+
+.skill-badge.ready {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.skill-badge.setup {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.skill-badge.blocked {
+  background: #fce4ec;
+  color: #c62828;
+}
+
+.skill-desc {
+  color: #666;
+  font-size: 0.8rem;
+  margin: 4px 0 0 0;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.skill-missing {
+  font-size: 0.75rem;
+  color: #999;
+  margin-top: 4px;
+  display: block;
+}
+
+.skill-toggle {
+  flex-shrink: 0;
+  padding: 5px 14px;
+  border: none;
+  border-radius: 5px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.skill-toggle.enable {
+  background: #e95420;
+  color: #fff;
+}
+
+.skill-toggle.enable:hover {
+  background: #d44a1a;
+}
+
+.skill-toggle.disable {
+  background: #f0f0f0;
+  color: #666;
+  border: 1px solid #ddd;
+}
+
+.skill-toggle.disable:hover {
+  background: #e5e5e5;
+}
+
+.skill-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

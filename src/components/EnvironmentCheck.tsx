@@ -9,6 +9,7 @@ interface EnvStatus {
 interface EnvCheckData {
   node: EnvStatus;
   git: EnvStatus;
+  openclaw: EnvStatus;
 }
 
 export default function EnvironmentCheck() {
@@ -34,6 +35,12 @@ export default function EnvironmentCheck() {
           <span className={`status-dot ${env.git.ok ? "ok" : "error"}`} />
           <span>
             Git {env.git.ok ? `${env.git.version}` : "未安装"}
+          </span>
+        </div>
+        <div className="env-item">
+          <span className={`status-dot ${env.openclaw.ok ? "ok" : "error"}`} />
+          <span>
+            OpenClaw {env.openclaw.ok ? `${env.openclaw.version}` : "未安装"}
           </span>
         </div>
       </div>

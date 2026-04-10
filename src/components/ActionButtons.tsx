@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 interface ActionButtonsProps {
@@ -17,12 +18,29 @@ export default function ActionButtons({
   onUninstallStart,
   onUninstallEnd,
 }: ActionButtonsProps) {
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    invoke<boolean>("is_openclaw_installed")
+      .then(setIsInstalled)
+      .catch(() => setIsInstalled(false));
+  }, []);
+
+  useEffect(() => {
+    if (!isDeploying && !isUninstalling) {
+      invoke<boolean>("is_openclaw_installed")
+        .then(setIsInstalled)
+        .catch(() => setIsInstalled(false));
+    }
+  }, [isDeploying, isUninstalling]);
+
   async function handleDeploy() {
     onDeployStart();
     try {
       const result = await invoke<{ success: boolean; error?: string }>(
         "deploy_openclaw"
       );
+      setIsInstalled(result.success);
       onDeployEnd(result.success);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -40,6 +58,7 @@ export default function ActionButtons({
       const result = await invoke<{ success: boolean; error?: string }>(
         "uninstall_openclaw"
       );
+      setIsInstalled(false);
       onUninstallEnd(result.success);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -55,14 +74,14 @@ export default function ActionButtons({
         <button
           className="btn btn-primary"
           onClick={handleDeploy}
-          disabled={isDeploying || isUninstalling}
+          disabled={isDeploying || isUninstalling || isInstalled}
         >
           {isDeploying ? "部署中..." : "一键部署"}
         </button>
         <button
           className="btn btn-danger"
           onClick={handleUninstall}
-          disabled={isDeploying || isUninstalling}
+          disabled={isDeploying || isUninstalling || !isInstalled}
         >
           {isUninstalling ? "卸载中..." : "一键卸载"}
         </button>
