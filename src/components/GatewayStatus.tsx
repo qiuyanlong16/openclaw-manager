@@ -4,24 +4,29 @@ import { invoke } from "@tauri-apps/api/core";
 export default function GatewayStatus() {
   const [running, setRunning] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
+  // Track user's explicit stop intent so polling doesn't override it
+  const [userStopped, setUserStopped] = useState(false);
 
   const fetchStatus = useCallback(async () => {
+    // Don't poll if user explicitly stopped it
+    if (userStopped) return;
     try {
       const result = await invoke<{ running: boolean }>("get_gateway_status");
       setRunning(result.running);
     } catch {
       setRunning(false);
     }
-  }, []);
+  }, [userStopped]);
 
   useEffect(() => {
     fetchStatus();
-    const interval = setInterval(fetchStatus, 5000);
+    const interval = setInterval(fetchStatus, 15000);
     return () => clearInterval(interval);
   }, [fetchStatus]);
 
   async function handleStart() {
     setLoading(true);
+    setUserStopped(false);
     try {
       await invoke("start_gateway");
       setRunning(true);
@@ -37,6 +42,7 @@ export default function GatewayStatus() {
     try {
       await invoke("stop_gateway");
       setRunning(false);
+      setUserStopped(true);
     } catch (e) {
       console.error("Failed to stop gateway:", e);
     } finally {

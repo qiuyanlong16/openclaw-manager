@@ -12,11 +12,20 @@ interface EnvCheckData {
   openclaw: EnvStatus;
 }
 
-export default function EnvironmentCheck() {
+interface EnvCheckProps {
+  onReady?: () => void;
+}
+
+export default function EnvironmentCheck({ onReady }: EnvCheckProps) {
   const [env, setEnv] = useState<EnvCheckData | null>(null);
 
   useEffect(() => {
-    invoke<EnvCheckData>("check_environment").then(setEnv).catch(console.error);
+    invoke<EnvCheckData>("check_environment")
+      .then((data) => {
+        setEnv(data);
+      })
+      .catch(console.error)
+      .finally(() => onReady?.());
   }, []);
 
   if (!env) return null;

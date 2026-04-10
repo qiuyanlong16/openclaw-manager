@@ -78,7 +78,7 @@ export default function Skills() {
   const readyCount = skills.filter((s) => s.eligible && !s.disabled).length;
   const totalCount = skills.length;
 
-  if (initialLoad) {
+  if (initialLoad && skills.length === 0) {
     return (
       <div className="skills-loading">
         <img src="/favicon.svg" alt="" className="lobster-loader" />

@@ -62,6 +62,37 @@ struct ModelConfigResult {
     custom_base_url: Option<String>,
 }
 
+// --- Weixin Types ---
+
+#[derive(Serialize, Clone)]
+struct WeixinConfigResult {
+    plugin_installed: bool,
+    enabled: bool,
+    connected: bool,
+    account_id: Option<String>,
+}
+
+#[derive(Serialize, Clone)]
+struct WeixinQrStartResult {
+    qrcode: String,
+    qrcode_img_content: String,
+    message: String,
+}
+
+#[derive(Serialize, Clone, Deserialize)]
+struct WeixinQrPollResult {
+    status: String,
+    bot_token: Option<String>,
+    account_id: Option<String>,
+    base_url: Option<String>,
+    user_id: Option<String>,
+}
+
+const WEIXIN_PLUGIN_ID: &str = "openclaw-weixin";
+const WEIXIN_CHANNEL_ID: &str = "openclaw-weixin";
+const I_LINK_BASE_URL: &str = "https://ilinkai.weixin.qq.com";
+const I_LINK_BOT_TYPE: &str = "3";
+
 // --- Helpers ---
 
 fn emit_log(app: &tauri::AppHandle, level: &str, message: &str) {
@@ -955,8 +986,478 @@ fn main() {
             set_model_config,
             list_skills,
             set_skill_enabled,
+            install_weixin_plugin,
+            get_weixin_config,
+            start_weixin_qr_login,
+            poll_weixin_qr_status,
+            save_weixin_login_result,
+            disconnect_weixin,
         ])
         .setup(|_app| Ok(()))
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+// --- Weixin Helpers ---
+
+fn is_weixin_plugin_installed() -> bool {
+    let bin = match get_openclaw_bin_path() {
+        Ok(b) => b,
+        Err(_) => return false,
+    };
+    let output = Command::new(&bin)
+        .args(["plugins", "list", "--json"])
+        .output();
+
+    match output {
+        Ok(output) if output.status.success() => {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            stdout.contains(WEIXIN_PLUGIN_ID)
+        }
+        _ => false,
+    }
+}
+
+fn is_weixin_channel_enabled() -> bool {
+    let config_path = match get_config_path() {
+        Ok(p) => p,
+        Err(_) => return false,
+    };
+    if !std::path::Path::new(&config_path).exists() {
+        return false;
+    }
+    let content = match std::fs::read_to_string(&config_path) {
+        Ok(c) => c,
+        Err(_) => return false,
+    };
+    let config: serde_json::Value = match serde_json::from_str(&content) {
+        Ok(v) => v,
+        Err(_) => return false,
+    };
+
+    // Check plugins.entries.openclaw-weixin.enabled
+    let plugin_enabled = config
+        .get("plugins")
+        .and_then(|p| p.get("entries"))
+        .and_then(|e| e.get(WEIXIN_PLUGIN_ID))
+        .and_then(|e| e.get("enabled"))
+        .and_then(|e| e.as_bool())
+        .unwrap_or(false);
+
+    let channel_enabled = config
+        .get("channels")
+        .and_then(|c| c.get(WEIXIN_CHANNEL_ID))
+        .and_then(|c| c.get("enabled"))
+        .and_then(|c| c.as_bool())
+        .unwrap_or(false);
+
+    plugin_enabled || channel_enabled
+}
+
+fn is_weixin_connected() -> Option<String> {
+    let index_path = format!("{}/.openclaw-weixin/state/accounts.json", get_home_dir().ok()?);
+
+    if !std::path::Path::new(&index_path).exists() {
+        return None;
+    }
+
+    let content = std::fs::read_to_string(&index_path).ok()?;
+    let ids: Vec<String> = serde_json::from_str(&content).ok()?;
+    if ids.is_empty() {
+        return None;
+    }
+
+    // Return the first account ID
+    Some(ids[0].clone())
+}
+
+fn https_get(url: &str, headers: Option<&[(&str, &str)]>, timeout_secs: u64) -> Result<(u16, String), String> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(timeout_secs))
+        .build()
+        .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))?;
+
+    let mut req = client.get(url);
+    if let Some(hdrs) = headers {
+        for (k, v) in hdrs {
+            req = req.header(*k, *v);
+        }
+    }
+
+    let resp = req.send().map_err(|e| format!("请求失败: {}", e))?;
+    let status = resp.status().as_u16();
+    let body = resp.text().map_err(|e| format!("读取响应失败: {}", e))?;
+
+    Ok((status, body))
+}
+
+fn update_openclaw_config(updater: impl FnOnce(&mut serde_json::Value)) -> Result<(), String> {
+    let config_path = get_config_path()?;
+
+    // Ensure .openclaw directory exists
+    let config_dir = format!("{}/.openclaw", get_home_dir()?);
+    std::fs::create_dir_all(&config_dir)
+        .map_err(|e| format!("创建配置目录失败: {}", e))?;
+
+    let config: serde_json::Value = if std::path::Path::new(&config_path).exists() {
+        let content = std::fs::read_to_string(&config_path)
+            .map_err(|e| format!("读取配置失败: {}", e))?;
+        serde_json::from_str(&content).unwrap_or(serde_json::json!({}))
+    } else {
+        serde_json::json!({})
+    };
+
+    let mut config = config;
+    updater(&mut config);
+
+    let updated = serde_json::to_string_pretty(&config)
+        .map_err(|e| format!("序列化配置失败: {}", e))?;
+    std::fs::write(&config_path, updated)
+        .map_err(|e| format!("写入配置失败: {}", e))?;
+
+    Ok(())
+}
+
+fn normalize_account_id(value: &str) -> String {
+    let trimmed = value.trim().to_lowercase();
+    if trimmed.is_empty() {
+        return "default".to_string();
+    }
+    let normalized: String = trimmed
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '-' })
+        .collect();
+    let trimmed = normalized.trim_start_matches('-').trim_end_matches('-');
+    if trimmed.is_empty() {
+        "default".to_string()
+    } else {
+        trimmed.chars().take(64).collect()
+    }
+}
+
+// --- Weixin Tauri Commands ---
+
+fn strip_ansi(s: &str) -> String {
+    let mut result = String::new();
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            chars.next(); // skip '['
+            while let Some(&cc) = chars.peek() {
+                chars.next();
+                if cc.is_ascii_alphabetic() {
+                    break;
+                }
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
+#[tauri::command(async)]
+async fn install_weixin_plugin(app: tauri::AppHandle) -> Result<DeployResult, String> {
+    let app_clone = app.clone();
+    emit_log(&app_clone, "info", "正在安装微信插件 @tencent-weixin/openclaw-weixin...");
+
+    let bin = get_openclaw_bin_path()?;
+    let result = tokio::task::spawn_blocking(move || {
+        Command::new(&bin)
+            .args(["plugins", "install", "@tencent-weixin/openclaw-weixin"])
+            .output()
+            .map_err(|e| format!("安装微信插件失败: {}", e))
+    })
+    .await
+    .map_err(|e| format!("安装微信插件失败: {}", e))??;
+
+    let stdout = String::from_utf8_lossy(&result.stdout);
+    let stderr = String::from_utf8_lossy(&result.stderr);
+
+    // Check if the plugin was actually installed (exit 0 or plugin directory exists)
+    let installed = result.status.success() || is_weixin_plugin_installed();
+
+    if installed {
+        emit_log(&app, "info", &format!("微信插件安装成功: {}", stdout.trim()));
+        Ok(DeployResult {
+            success: true,
+            error: None,
+        })
+    } else {
+        let err_msg = strip_ansi(stderr.trim().lines().next().unwrap_or("未知错误"));
+        emit_log(&app, "error", &format!("安装失败: {}", err_msg));
+        Err(format!("安装失败: {}", err_msg))
+    }
+}
+
+#[tauri::command(async)]
+async fn get_weixin_config() -> WeixinConfigResult {
+    let plugin_installed = tokio::task::spawn_blocking(is_weixin_plugin_installed)
+        .await
+        .unwrap_or(false);
+    let enabled = is_weixin_channel_enabled();
+    let account_id = is_weixin_connected();
+    let connected = account_id.is_some();
+
+    WeixinConfigResult {
+        plugin_installed,
+        enabled,
+        connected,
+        account_id,
+    }
+}
+
+#[tauri::command(async)]
+async fn start_weixin_qr_login() -> Result<WeixinQrStartResult, String> {
+    tokio::task::spawn_blocking(|| {
+        let base = I_LINK_BASE_URL;
+        let url = format!("{}/ilink/bot/get_bot_qrcode?bot_type={}", base, I_LINK_BOT_TYPE);
+
+        let (status, body) = https_get(&url, None, 35)?;
+        if status != 200 {
+            return Err(format!("获取二维码失败: HTTP {}", status));
+        }
+
+        let data: serde_json::Value = serde_json::from_str(&body)
+            .map_err(|e| format!("解析响应失败: {}", e))?;
+
+        let qrcode = data.get("qrcode")
+            .and_then(|v| v.as_str())
+            .ok_or("未获取到 qrcode")?
+            .to_string();
+
+        let qrcode_img_content = data.get("qrcode_img_content")
+            .and_then(|v| v.as_str())
+            .ok_or("未获取到 qrcode_img_content")?
+            .to_string();
+
+        Ok(WeixinQrStartResult {
+            qrcode,
+            qrcode_img_content,
+            message: "使用微信扫描以下二维码，以完成连接。".to_string(),
+        })
+    })
+    .await
+    .map_err(|e| format!("获取二维码失败: {}", e))?
+}
+
+#[tauri::command(async)]
+async fn poll_weixin_qr_status(qrcode: String) -> Result<WeixinQrPollResult, String> {
+    tokio::task::spawn_blocking(move || {
+        let base = I_LINK_BASE_URL;
+        let url = format!("{}/ilink/bot/get_qrcode_status?qrcode={}", base, qrcode);
+
+        let headers = vec![("iLink-App-ClientVersion", "1")];
+        let (status, body) = match https_get(&url, Some(&headers), 35) {
+            Ok(v) => v,
+            Err(_) => {
+                return Ok(WeixinQrPollResult {
+                    status: "wait".to_string(),
+                    bot_token: None,
+                    account_id: None,
+                    base_url: None,
+                    user_id: None,
+                });
+            }
+        };
+
+        if status != 200 {
+            return Ok(WeixinQrPollResult {
+                status: "wait".to_string(),
+                bot_token: None,
+                account_id: None,
+                base_url: None,
+                user_id: None,
+            });
+        }
+
+        let data: serde_json::Value = match serde_json::from_str(&body) {
+            Ok(v) => v,
+            Err(_) => {
+                return Ok(WeixinQrPollResult {
+                    status: "wait".to_string(),
+                    bot_token: None,
+                    account_id: None,
+                    base_url: None,
+                    user_id: None,
+                });
+            }
+        };
+
+        Ok(WeixinQrPollResult {
+            status: data.get("status")
+                .and_then(|v| v.as_str())
+                .unwrap_or("wait")
+                .to_string(),
+            bot_token: data.get("bot_token").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            account_id: data.get("ilink_bot_id").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            base_url: data.get("baseurl").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            user_id: data.get("ilink_user_id").and_then(|v| v.as_str()).map(|s| s.to_string()),
+        })
+    })
+    .await
+    .map_err(|e| format!("轮询失败: {}", e))?
+}
+
+#[tauri::command(async)]
+async fn save_weixin_login_result(result: WeixinQrPollResult) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || {
+        do_save_weixin_login_result(result)
+    })
+    .await
+    .map_err(|e| format!("保存凭据失败: {}", e))?
+}
+
+fn do_save_weixin_login_result(result: WeixinQrPollResult) -> Result<String, String> {
+    let account_id = result.account_id
+        .as_ref()
+        .ok_or("缺少 accountId")?;
+    let bot_token = result.bot_token
+        .as_ref()
+        .ok_or("缺少 botToken")?;
+
+    let normalized_id = normalize_account_id(account_id);
+    let home = get_home_dir()?;
+
+    // Create state directories
+    let accounts_dir = format!("{}/.openclaw-weixin/state/accounts", home);
+    std::fs::create_dir_all(&accounts_dir)
+        .map_err(|e| format!("创建目录失败: {}", e))?;
+
+    // Write account data
+    let mut account_data = serde_json::json!({
+        "token": bot_token,
+        "savedAt": chrono_lite_timestamp()
+    });
+    if let Some(ref base_url) = result.base_url {
+        account_data["baseUrl"] = serde_json::json!(base_url);
+    }
+    if let Some(ref user_id) = result.user_id {
+        account_data["userId"] = serde_json::json!(user_id);
+    }
+
+    let account_path = format!("{}/{}.json", accounts_dir, normalized_id);
+    std::fs::write(&account_path, serde_json::to_string_pretty(&account_data).unwrap())
+        .map_err(|e| format!("写入账号数据失败: {}", e))?;
+
+    // Try to set file permissions
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(metadata) = std::fs::metadata(&account_path) {
+            let mut perms = metadata.permissions();
+            perms.set_mode(0o600);
+            let _ = std::fs::set_permissions(&account_path, perms);
+        }
+    }
+
+    // Write account index
+    let index_path = format!("{}/.openclaw-weixin/state/accounts.json", home);
+    let existing_ids = if std::path::Path::new(&index_path).exists() {
+        let content = std::fs::read_to_string(&index_path).unwrap_or_default();
+        serde_json::from_str::<Vec<String>>(&content).unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+
+    if !existing_ids.contains(&normalized_id) {
+        let mut ids = existing_ids;
+        ids.push(normalized_id.clone());
+        std::fs::write(&index_path, serde_json::to_string_pretty(&ids).unwrap())
+            .map_err(|e| format!("写入账号索引失败: {}", e))?;
+    }
+
+    // Update openclaw.json to enable the channel
+    update_openclaw_config(|config| {
+        // Enable plugin
+        config["plugins"]["entries"][WEIXIN_PLUGIN_ID]["enabled"] = serde_json::json!(true);
+        // Enable channel
+        config["channels"][WEIXIN_CHANNEL_ID]["enabled"] = serde_json::json!(true);
+    })?;
+
+    Ok(normalized_id)
+}
+
+fn chrono_lite_timestamp() -> String {
+    // Simple ISO 8601 timestamp without external crate dependency
+    let secs_since_epoch = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    // Format as ISO 8601 (approximate, good enough for savedAt field)
+    let days = secs_since_epoch / 86400;
+    let remaining = secs_since_epoch % 86400;
+    let hours = remaining / 3600;
+    let minutes = (remaining % 3600) / 60;
+    let seconds = remaining % 60;
+
+    // Days from epoch to year
+    let mut year = 1970;
+    let mut d = days;
+    loop {
+        let year_days = if is_leap_year(year) { 366 } else { 365 };
+        if d < year_days { break; }
+        d -= year_days;
+        year += 1;
+    }
+    let month_days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    let mut month = 0;
+    for (i, &md) in month_days.iter().enumerate() {
+        let adjusted = if i == 1 && is_leap_year(year) { 29 } else { md };
+        if d < adjusted { break; }
+        d -= adjusted;
+        month += 1;
+    }
+    let day = d + 1;
+
+    format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z", year, month + 1, day, hours, minutes, seconds)
+}
+
+fn is_leap_year(year: u64) -> bool {
+    (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
+}
+
+#[tauri::command(async)]
+async fn disconnect_weixin(app: tauri::AppHandle) -> Result<DeployResult, String> {
+    emit_log(&app, "info", "正在断开微信连接...");
+
+    tokio::task::spawn_blocking(do_disconnect_weixin)
+        .await
+        .map_err(|e| format!("断开微信失败: {}", e))??;
+
+    emit_log(&app, "info", "微信连接已断开");
+    Ok(DeployResult {
+        success: true,
+        error: None,
+    })
+}
+
+fn do_disconnect_weixin() -> Result<(), String> {
+    let home = get_home_dir()?;
+    let accounts_dir = format!("{}/.openclaw-weixin/state/accounts", home);
+    let index_path = format!("{}/.openclaw-weixin/state/accounts.json", home);
+
+    // Delete account data files
+    if std::path::Path::new(&accounts_dir).exists() {
+        if let Ok(entries) = std::fs::read_dir(&accounts_dir) {
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    let _ = std::fs::remove_file(entry.path());
+                }
+            }
+        }
+    }
+
+    // Clear account index
+    let _ = std::fs::write(&index_path, "[]");
+
+    // Update openclaw.json to disable the channel
+    update_openclaw_config(|config| {
+        if let Some(plugin) = config.get_mut("plugins").and_then(|p| p.get_mut("entries")).and_then(|e| e.get_mut(WEIXIN_PLUGIN_ID)) {
+            plugin["enabled"] = serde_json::json!(false);
+        }
+        if let Some(channel) = config.get_mut("channels").and_then(|c| c.get_mut(WEIXIN_CHANNEL_ID)) {
+            channel["enabled"] = serde_json::json!(false);
+        }
+    })
 }

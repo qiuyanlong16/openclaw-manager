@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import Skills from "./Skills";
+import Channels from "./Channels";
 
-type Section = "model" | "skills";
+type Section = "model" | "skills" | "channels";
 
 const providers = [
   { id: "anthropic", label: "Anthropic", models: ["claude-sonnet-4-5-20250929", "claude-opus-4-5-20251101", "claude-haiku-4-5-20251001", "claude-sonnet-4-20250514", "claude-3-5-sonnet-20241022"] },
@@ -34,6 +35,7 @@ export default function Settings({ onClose }: SettingsProps) {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ ok: boolean; msg: string } | null>(null);
   const [showKey, setShowKey] = useState(false);
+  const [tabLoading, setTabLoading] = useState(false);
 
   useEffect(() => {
     invoke<Partial<ModelConfig>>("get_model_config")
@@ -44,6 +46,15 @@ export default function Settings({ onClose }: SettingsProps) {
       })
       .catch(console.error);
   }, []);
+
+  function switchTab(tab: Section) {
+    if (tab === activeSection) return;
+    setTabLoading(tab === "skills");
+    setActiveSection(tab);
+    if (tab === "skills") {
+      setTimeout(() => setTabLoading(false), 500);
+    }
+  }
 
   async function handleSave() {
     if (config.provider === "custom" && (!config.customBaseUrl || !config.customBaseUrl.trim())) {
@@ -75,22 +86,31 @@ export default function Settings({ onClose }: SettingsProps) {
     <div className="settings-overlay" onClick={onClose}>
       <div className="settings-panel" onClick={(e) => e.stopPropagation()}>
         <div className="settings-header">
-          <h1>设置</h1>
+          <span className="settings-header-left">
+            <span className="settings-header-icon">⚙</span>
+            <h1>设置</h1>
+          </span>
           <button className="settings-close" onClick={onClose}>✕</button>
         </div>
         <div className="settings-body">
           <div className="settings-sidebar">
             <button
               className={`settings-nav ${activeSection === "model" ? "active" : ""}`}
-              onClick={() => setActiveSection("model")}
+              onClick={() => switchTab("model")}
             >
               <span className="nav-icon">⚙</span> Model
             </button>
             <button
               className={`settings-nav ${activeSection === "skills" ? "active" : ""}`}
-              onClick={() => setActiveSection("skills")}
+              onClick={() => switchTab("skills")}
             >
               <span className="nav-icon">🧩</span> Skills
+            </button>
+            <button
+              className={`settings-nav ${activeSection === "channels" ? "active" : ""}`}
+              onClick={() => switchTab("channels")}
+            >
+              <span className="nav-icon">📡</span> Channels
             </button>
           </div>
           <div className="settings-content">
@@ -197,7 +217,18 @@ export default function Settings({ onClose }: SettingsProps) {
                 </div>
               </div>
             )}
-            {activeSection === "skills" && <Skills />}
+            {activeSection === "skills" && (
+              <div style={{ position: "relative", width: "100%" }}>
+                {tabLoading && (
+                  <div className="skills-loading-overlay">
+                    <div className="spinner" />
+                    <span>正在加载 Skills 列表...</span>
+                  </div>
+                )}
+                <Skills />
+              </div>
+            )}
+            {activeSection === "channels" && <Channels />}
           </div>
         </div>
       </div>
