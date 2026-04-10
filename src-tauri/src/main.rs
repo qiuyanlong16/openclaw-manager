@@ -7,8 +7,11 @@ use std::sync::Mutex;
 use tauri::Emitter;
 use tokio::process::Command as TokioCommand;
 
-// Track the gateway child process so we can stop it
-static GATEWAY_CHILD: Mutex<Option<std::process::Child>> = Mutex::new(None);
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
+
+// Track the gateway child process so we can kill the entire process group
+static GATEWAY_PID: Mutex<Option<u32>> = Mutex::new(None);
 
 // --- Types ---
 
@@ -254,24 +257,32 @@ async fn spawn_gateway(app: &tauri::AppHandle) -> Result<(), String> {
     let bin = get_openclaw_bin_path()?;
     emit_log(app, "info", "启动 gateway run...");
 
-    // First stop any existing gateway child
-    if let Ok(mut guard) = GATEWAY_CHILD.lock() {
-        if let Some(mut child) = guard.take() {
-            let _ = child.kill();
-        }
-    }
+    // First kill any existing gateway process group
+    kill_gateway_group();
 
     // Also try killing any existing openclaw gateway process on the port
     let _ = run_command_async(app, &bin, &["gateway", "stop"], "清理旧网关").await;
 
-    // Spawn `openclaw gateway run` as a background process
-    let mut child = std::process::Command::new(&bin)
-        .args(["gateway", "run"])
+    // Spawn `openclaw gateway run` in its own process group
+    let mut cmd = std::process::Command::new(&bin);
+    cmd.args(["gateway", "run"])
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+
+    #[cfg(unix)]
+    unsafe {
+        cmd.pre_exec(|| {
+            libc::setsid();
+            Ok(())
+        });
+    }
+
+    let mut child = cmd
         .spawn()
         .map_err(|e| format!("启动网关失败: {}", e))?;
+
+    let pid = child.id();
 
     // Give it a moment to start up
     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
@@ -281,9 +292,9 @@ async fn spawn_gateway(app: &tauri::AppHandle) -> Result<(), String> {
         return Err("网关启动后立即退出".to_string());
     }
 
-    // Store the child process handle
-    if let Ok(mut guard) = GATEWAY_CHILD.lock() {
-        *guard = Some(child);
+    // Store the PID for process group killing
+    if let Ok(mut guard) = GATEWAY_PID.lock() {
+        *guard = Some(pid);
     }
 
     Ok(())
@@ -534,13 +545,26 @@ struct GatewayStatusResult {
 
 #[tauri::command]
 fn get_gateway_status() -> GatewayStatusResult {
-    // First check if our tracked child process is still running
-    if let Ok(mut guard) = GATEWAY_CHILD.lock() {
-        if let Some(child) = guard.as_mut() {
-            if child.try_wait().map_or(false, |s| s.is_none()) {
-                return GatewayStatusResult { running: true };
-            } else {
-                guard.take(); // child exited, clear it
+    // First check if our tracked gateway process group is still running
+    if let Ok(guard) = GATEWAY_PID.lock() {
+        if let Some(pid) = *guard {
+            #[cfg(unix)]
+            {
+                // Check if the process group leader is alive
+                let alive = unsafe { libc::kill(pid as i32, 0) == 0 };
+                if alive {
+                    return GatewayStatusResult { running: true };
+                } else {
+                    // Process is gone, clear the PID
+                    drop(guard);
+                    if let Ok(mut g) = GATEWAY_PID.lock() {
+                        *g = None;
+                    }
+                }
+            }
+            #[cfg(not(unix))]
+            {
+                let _ = pid;
             }
         }
     }
@@ -591,13 +615,7 @@ async fn start_gateway(app: tauri::AppHandle) -> Result<DeployResult, String> {
 async fn stop_gateway(app: tauri::AppHandle) -> Result<DeployResult, String> {
     emit_log(&app, "info", "正在停止网关...");
 
-    // Kill the tracked child process
-    if let Ok(mut guard) = GATEWAY_CHILD.lock() {
-        if let Some(mut child) = guard.take() {
-            let _ = child.kill();
-            emit_log(&app, "info", "已终止网关进程");
-        }
-    }
+    kill_gateway_group();
 
     // Also try the CLI stop command for cleanup
     let _ = run_openclaw_cmd(&app, &["gateway", "stop"], "清理网关").await;
@@ -607,6 +625,43 @@ async fn stop_gateway(app: tauri::AppHandle) -> Result<DeployResult, String> {
         success: true,
         error: None,
     })
+}
+
+/// Kill the entire gateway process group (parent + all children)
+fn kill_gateway_group() {
+    if let Ok(guard) = GATEWAY_PID.lock() {
+        if let Some(pid) = *guard {
+            #[cfg(unix)]
+            {
+                // Send SIGTERM to the process group (negative PID = process group)
+                unsafe {
+                    libc::killpg(pid as i32, libc::SIGTERM);
+                }
+                // Brief wait for graceful shutdown
+                std::thread::sleep(std::time::Duration::from_millis(500));
+                // Force kill if still alive
+                unsafe {
+                    libc::killpg(pid as i32, libc::SIGKILL);
+                }
+            }
+            #[cfg(not(unix))]
+            {
+                // Fallback for non-Unix: try to kill via PID
+                if let Ok(mut g) = GATEWAY_PID.lock() {
+                    if let Some(p) = *g {
+                        let _ = std::process::Command::new("taskkill")
+                            .args(["/PID", &p.to_string(), "/F", "/T"])
+                            .output();
+                    }
+                    *g = None;
+                }
+            }
+        }
+    }
+    // Clear the stored PID
+    if let Ok(mut g) = GATEWAY_PID.lock() {
+        *g = None;
+    }
 }
 
 fn get_gateway_token() -> Option<String> {
