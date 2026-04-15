@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import Skills from "./Skills";
-import Channels from "./Channels";
 
-type Section = "model" | "skills" | "channels";
+type Section = "model" | "skills";
 
 const providers = [
   { id: "anthropic", label: "Anthropic", models: ["claude-sonnet-4-5-20250929", "claude-opus-4-5-20251101", "claude-haiku-4-5-20251001", "claude-sonnet-4-20250514", "claude-3-5-sonnet-20241022"] },
@@ -105,12 +104,6 @@ export default function Settings({ onClose }: SettingsProps) {
               onClick={() => switchTab("skills")}
             >
               <span className="nav-icon">🧩</span> Skills
-            </button>
-            <button
-              className={`settings-nav ${activeSection === "channels" ? "active" : ""}`}
-              onClick={() => switchTab("channels")}
-            >
-              <span className="nav-icon">📡</span> Channels
             </button>
           </div>
           <div className="settings-content">
@@ -228,7 +221,6 @@ export default function Settings({ onClose }: SettingsProps) {
                 <Skills />
               </div>
             )}
-            {activeSection === "channels" && <Channels />}
           </div>
         </div>
       </div>
